@@ -1,14 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const morgan = require('morgan');
-
+const cors = require('cors');
+const helmet = require('helmet');
 const MovieData = require('./movie-data-small.json');
-//need to require helmet & cors later
 const app = express();
 
 app.use(morgan('dev'));
+app.use(cors());
+app.use(helmet());
+
 app.use(function validateBearerToken(req, res, next) {
-  const authToken = req.get('Authorization')
+  const authToken = req.get('Authorization');
   const apiToken = process.env.API_TOKEN;
 
   console.log('validate bearer token middleware');
@@ -19,17 +22,36 @@ app.use(function validateBearerToken(req, res, next) {
   next();
 });
 
-
-//endpoint is GET /movie
-
 const HandleGetMovies = (req, res) => {
-  res.json('Hello');
+  let { genre, country, avg_vote } = req.query;
+  let response = [...MovieData];
+
+  if (genre) {
+    genre = genre.toLowerCase();
+    response = response.filter(movie => movie.genre.toLowerCase().includes(genre));
+  }
+  
+  if (country) {
+    country = country.toLowerCase();
+    response = response.filter(movie => movie.country.toLowerCase().includes(country));
+  }  
+
+  if (avg_vote) {
+    let vote = parseFloat(avg_vote);
+    if(vote < 0 || vote > 10) {
+      res.status(401).json({ error: 'Provide a number between 0 and 10'});
+    }
+
+    if (Number.isNaN(vote)) {
+      res.status(401).json({ error: 'Expected a number' })
+    }
+    
+    response = response.filter(movie => movie.avg_vote >= vote);
+  }
+  res.json(response);
 };
-// Users can search for Movies by genre, country or avg_vote
 
 app.get('/movie', HandleGetMovies);
-
-//The endpoint only responds when given a valid Authorization header with a Bearer API token value.
 
 const PORT = 8000;
 
